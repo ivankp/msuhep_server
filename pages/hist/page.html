@@ -1,0 +1,41 @@
+<!DOCTYPE HTML>
+<html lang="en-US">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoSam histograms</title>
+<link rel="icon" type="image/svg+xml" href="icons/helmet.svg">
+<link rel="stylesheet" href="styles.css" type="text/css">
+<script src="js/jquery-3.3.1.min.js"></script>
+<script src="js/d3.v5.min.js"></script>
+<script src="js/d3-selection-multi.v1.min.js"></script>
+<script src="js/d3-plot.js"></script>
+<script src="js/jscolor.min.js"></script>
+<script src="js/dbview.js"></script>
+<script src="js/jquery.contextMenu.min.js"></script>
+<script src="js/jquery.ui.position.min.js"></script>
+<script><!-- @VARS --></script>
+<script src="hist/main.js"></script>
+</head>
+<body>
+
+<div id="nav">
+  <ul>
+    <li class="active"><a href="/">GoSam histograms</a></li>
+  </ul>
+</div>
+
+<div id="dbview"></div>
+
+<div id="color_picker" style="display:none;">
+<input class="jscolor {hash:true}">
+</div>
+
+<div id="nodata" style="display:none;">No data</div>
+<div id="plots"><div></div><div></div></div>
+
+<div><span id="show_notes" style="display:none;">[notes]</span></div>
+<div id="notes"></div>
+
+</body>
+</html>
