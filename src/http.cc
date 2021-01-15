@@ -113,7 +113,6 @@ request::request(
         a = b+1; // beginning of next line
       }
     } else if (c<'\x20' || '\x7E'<c) {
-      TEST(std::string_view(buffer,b-buffer))
       HTTP_ERROR(400,"HTTP header: invalid character ",int(c));
     } else {
       nn = 0;
@@ -235,35 +234,35 @@ std::string header(
 
 // send whole file --------------------------------------------------
 void send_file(socket sock, const char* name, bool keep_alive, bool gzok) {
+  scope_fd f1 = ::open(name, O_RDONLY);
+  struct stat s1;
+  if (f1 == -1)
+    HTTP_ERROR(404,"open(",name,"): ",std::strerror(errno));
+  if (::fstat(f1, &s1) == -1)
+    HTTP_ERROR(404,"fstat(): ",std::strerror(errno));
+  if (!S_ISREG(s1.st_mode))
+    HTTP_ERROR(404,name," is not a regular file");
+
   const char *mime = "text/plain; charset=UTF-8",
              *ext = strrchr(name,'.');
   if (ext) {
     const auto it = mimes.find(++ext);
     if (it != mimes.end()) mime = it->second;
   }
-
-  // const char* encoding = "";
-
-  scope_fd f1 = ::open(name, O_RDONLY);
-  struct stat s1;
-  if (f1 == -1)
-    HTTP_ERROR(404,"open(\"",name,"\"): ",std::strerror(errno));
-  if (::fstat(f1, &s1) == -1)
-    HTTP_ERROR(404,"fstat(): ",std::strerror(errno));
-  if (!S_ISREG(s1.st_mode))
-    HTTP_ERROR(404,"not a regular file");
+  const char* encoding = "";
+  std::string name_gz;
 
   if (gzok && [ext](const auto*... x){
     return ( ... && strcmp(ext,x) );
   }("jpg","png","webp","gif")){ // exclude extensions
-    auto name_gz = cat("cache/gz/",name,".gz");
+    name_gz = cat("cache/gz/",name,".gz");
     scope_fd f2 = ::open(name_gz.c_str(), O_RDONLY);
     struct stat s2;
     if (f2 != -1) {
       if (::fstat(f2, &s2) == -1) {
         REDERR "fstat(): " << std::strerror(errno);
       } else if (!S_ISREG(s2.st_mode)) {
-        REDERR "not a regular file";
+        REDERR << name_gz << " is not a regular file";
       } else if (s1.st_mtime < s2.st_mtime) { // send gz file from cache
         goto send_gz;
       } else { // gz file needs updating
@@ -293,32 +292,24 @@ update_gz:
         }
         if (f2 != -1) {
 send_gz:
-          // encoding = "Content-Encoding: gzip\r\n";
           // f1 = std::move(f2); // closes f1
-          // s1.st_size = s2.st_size;
-
-          sock << header(mime,s2.st_size,keep_alive,
-            "Content-Encoding: gzip\r\n");
-          // dispatch_file(name_gz.c_str(), sock);
-          if (const auto f = file_cache(name_gz.c_str())) {
-            sock << *f;
-          } else { // send file without caching
-            HTTP_ERROR(500,name," cannot be cached");
-          }
-          return;
+          s1.st_size = s2.st_size;
+          name = name_gz.c_str();
+          encoding = "Content-Encoding: gzip\r\n";
         }
       }
     }
 failed_gz: ;
   }
 
-  sock << header(mime, s1.st_size, keep_alive);
+  // TODO: TCP_CORK
+  sock << header(mime, s1.st_size, keep_alive, encoding);
   if (const auto f = file_cache(name)) {
     sock << *f;
-  } else { // send file without caching
+  } else {
+    // TODO: send file without caching
     HTTP_ERROR(500,name," cannot be cached");
   }
-  // // TODO: TCP_CORK
   // { off_t offset = 0;
   //   size_t size = s1.st_size;
   //   while (size) {
@@ -333,8 +324,6 @@ failed_gz: ;
   //     size -= ret;
   //   }
   // }
-
-  // dispatch_file()
 }
 
 void send_str(

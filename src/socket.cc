@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <sched.h>
 #include "error.hh"
-// #include "debug.hh"
+#include "debug.hh"
 
 namespace ivanp {
 
@@ -23,7 +23,7 @@ size_t socket::read(char* buffer, size_t size) const {
 void socket::write(const char* data, size_t size) const {
   while (size) {
     const auto ret = ::write(fd, data, size);
-    // TEST(ret)
+    TEST(ret)
     if (ret < 0) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         ::sched_yield();

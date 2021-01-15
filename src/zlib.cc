@@ -14,6 +14,7 @@
 
 #include "scope_guard.hh"
 #include "error.hh"
+// #include "debug.hh"
 
 namespace zlib {
 
@@ -73,6 +74,7 @@ size_t deflate_f(int f1, int f2, size_t len1, bool gz) {
     struct stat s1;
     PCALL(fstat)(f1, &s1);
     if (!S_ISREG(s1.st_mode)) ERROR("not a regular file");
+    len1 = s1.st_size;
   }
   unsigned char* in = reinterpret_cast<unsigned char*>(
     ::mmap(0,len1,PROT_READ,MAP_SHARED,f1,0));
@@ -90,15 +92,14 @@ size_t deflate_f(int f1, int f2, size_t len1, bool gz) {
   zs.zfree = Z_NULL;
   zs.opaque = Z_NULL;
 
-  int ret;
-  if ((ret = ::deflateInit2(
+  if (const int ret = ::deflateInit2(
     &zs,
     Z_BEST_COMPRESSION,
     Z_DEFLATED,
     gz ? 15|16 : 15,
     8,
     Z_DEFAULT_STRATEGY
-  )) != Z_OK) ERROR("deflateInit2(): ",zerrmsg(ret));
+  ); ret != Z_OK) ERROR("deflateInit2(): ",zerrmsg(ret));
 
   scope_guard deflate_end([&]{ (void)::deflateEnd(&zs); });
 
@@ -108,8 +109,11 @@ size_t deflate_f(int f1, int f2, size_t len1, bool gz) {
   do {
     zs.next_out = out;
     zs.avail_out = len2;
-    while ((ret = ::deflate(&zs, Z_FINISH)) == Z_OK || ret == Z_BUF_ERROR) { }
-    if (ret != Z_STREAM_END) ERROR("deflate(): ",zerrmsg(ret));
+    // while (::deflate(&zs, Z_FINISH) != Z_STREAM_END) { }
+    // if (ret == Z_STREAM_ERROR) ERROR("deflate(): ",zerrmsg(ret));
+    // TEST(zerrmsg(::deflate(&zs, Z_FINISH)))
+    // TODO: make sure deflate() doesn't need to be called in a loop
+    ::deflate(&zs, Z_FINISH);
     const ssize_t have = len2 - zs.avail_out;
     const ssize_t nbytes = ::write(f2, out, have);
     if (nbytes != have) {

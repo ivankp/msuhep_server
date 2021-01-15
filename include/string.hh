@@ -110,19 +110,32 @@ inline void ctrim(char*& s, const char* end, T... x) noexcept {
   }
 }
 
-inline void replace_first(
-  std::string& str, std::string_view s1, std::string_view s2
+inline std::string replace_first(
+  std::string_view str, std::string_view s1, std::string_view s2
 ) {
-  const auto pos = str.find(s1);
-  if (pos != std::string::npos) str.replace(pos,s1.size(),s2);
+  size_t pos = str.find(s1);
+  if (pos != std::string_view::npos) {
+    std::string out;
+    out.reserve(str.size()-s1.size()+s2.size());
+    out.append(str.data(),pos).append(s2);
+    pos += s1.size();
+    out.append(str.data()+pos,str.size()-pos);
+    return out;
+  } else return std::string(str);
 }
-inline void replace_all(
-  std::string& str, std::string_view s1, std::string_view s2
+inline std::string replace_all(
+  std::string_view str, std::string_view s1, std::string_view s2
 ) {
-  for (size_t p; (p = str.find(s1,p)) != std::string::npos; ) {
-    str.replace(p, s1.size(), s2);
-    p += s2.size();
+  std::string out;
+  size_t a=0, b=0;
+  while ((b = str.find(s1,a)) != std::string_view::npos) {
+    const size_t len = out.size() + (str.size() - a - s1.size() + s2.size());
+    if (len > out.capacity()) out.reserve(len);
+    out.append(str.data()+a,b-a).append(s2);
+    a = b + s1.size();
   }
+  out.append(str.data()+b,str.size()-b);
+  return out;
 }
 
 } // end namespace ivanp

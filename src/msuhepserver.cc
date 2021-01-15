@@ -7,7 +7,7 @@
 #include <ctre.hpp>
 
 // #include "sqlite3/sqlite.hh"
-#include "whole_file.hh"
+// #include "whole_file.hh"
 #include "file_cache.hh"
 #include "server.hh"
 #include "http.hh"
@@ -88,23 +88,28 @@ int main(int argc, char* argv[]) {
             false);
 
         } else if (!strcmp(path,"hist")) {
-          auto page = whole_file("pages/hist/page.html");
-          replace_first(page,"<!-- @VARS -->",[]{
-            std::stringstream ss;
-            ss << "\nconst dbs = [";
-            for (bool first=true; const auto& x :
-              std::filesystem::directory_iterator("pages/hist/db")
-            ) {
-              if (first) first = false;
-              else ss << ',';
-              ss << std::quoted(x.path().filename().string());
-            }
-            ss << "];\n";
-            return std::move(ss).str();
-          }());
-          http::send_str(sock,page,"html",keep_alive,
-            // req.qvalue("Accept-Encoding","gzip"));
-            false);
+          if (const auto f = file_cache("pages/hist/page.html")) {
+            http::send_str(
+              sock, replace_first(*f,"<!-- @VARS -->",[]{
+                std::stringstream ss;
+                ss << "\nconst dbs = [";
+                for (bool first=true; const auto& x :
+                  std::filesystem::directory_iterator("pages/hist/db")
+                ) {
+                  if (first) first = false;
+                  else ss << ',';
+                  ss << std::quoted(x.path().filename().string());
+                }
+                ss << "];\n";
+                return std::move(ss).str();
+              }()), "html", keep_alive,
+              // req.qvalue("Accept-Encoding","gzip")
+              false
+            );
+          } else {
+            // TODO: send file without caching
+            HTTP_ERROR(500,"page cannot be cached");
+          }
 
         } else { // serve any allowed file --------------------------
           // disallow arbitrary path
