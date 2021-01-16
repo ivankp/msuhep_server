@@ -16,24 +16,20 @@ DEPFLAGS = -MT $@ -MMD -MP -MF .build/$*.d
 #####################################################################
 
 all: $(patsubst %, bin/%, \
-  test \
+  msuhepserver \
 )
-# msuhepserver
 # sqlite3
 
 #####################################################################
 LIB = -Llib -Wl,-rpath=$(PWD)/lib
-
-bin/test: .build/server.o .build/socket.o
-LF_test := -pthread
 
 bin/msuhepserver: $(patsubst %, .build/%.o, \
   server socket whole_file file_cache http zlib \
 )
 # lib/libsqlite3.so
 LF_msuhepserver := -pthread $(LIB)
-# L_msuhepserver := -lsqlite3 -lz
 L_msuhepserver := -lz
+# -lsqlite3
 
 C__sqlite3 := -Iinclude/sqlite3
 C_sqlite3/sqlite3 := $(C__sqlite3) -fPIC

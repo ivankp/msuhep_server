@@ -2,9 +2,11 @@
 #define IVANP_SERVER_HH
 
 #include <cstdint>
+#include <cstdlib>
 #include <vector>
 #include <thread>
 #include <iostream>
+#include <utility>
 
 #include "socket.hh"
 #include "thread_safe_queue.hh"
@@ -26,12 +28,25 @@ private:
   const int epoll_timeout;
 
   struct thread_buffer {
-    char* m;
-    size_t size;
+    char* m = nullptr;
+    size_t size = 0;
 
     thread_buffer(size_t size) noexcept
     : m(reinterpret_cast<char*>(malloc(size))), size(size) { }
     ~thread_buffer() { free(m); }
+    thread_buffer() noexcept = default;
+    thread_buffer(const thread_buffer&) = delete;
+    thread_buffer& operator=(const thread_buffer&) = delete;
+    thread_buffer(thread_buffer&& o) noexcept
+    : m(o.m), size(o.size) {
+      o.m = nullptr;
+      o.size = 0;
+    }
+    thread_buffer& operator=(thread_buffer&& o) noexcept {
+      std::swap(m,o.m);
+      std::swap(size,o.size);
+      return *this;
+    }
   };
 
   void epoll_add(int);
@@ -49,7 +64,7 @@ public:
   ) noexcept {
     threads.reserve(threads.size()+nthreads);
     for (unsigned i=0; i<nthreads; ++i) {
-      threads.emplace_back([ this,
+      threads.emplace_back([ &queue = this->queue,
         worker_function,
         buffer = thread_buffer(buffer_size)
       ]() mutable {

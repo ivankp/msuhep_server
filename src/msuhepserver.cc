@@ -3,8 +3,9 @@
 #include <fstream>
 #include <cstdint>
 #include <filesystem>
+#include <algorithm>
 
-#include <ctre.hpp>
+// #include <ctre.hpp>
 
 // #include "sqlite3/sqlite.hh"
 // #include "whole_file.hh"
@@ -24,7 +25,7 @@ using namespace ivanp;
 int main(int argc, char* argv[]) {
   server::port_t server_port = 80;
   unsigned nthreads = std::thread::hardware_concurrency();
-  unsigned epoll_buffer_size = nthreads*2;
+  unsigned epoll_buffer_size = std::max(nthreads*2,(unsigned)8);
   int epoll_timeout = -1;
   size_t thread_buffer_size = 1<<13;
 
@@ -58,13 +59,15 @@ int main(int argc, char* argv[]) {
       if (!req.method) return;
       const auto g = req.get_params();
 
-      bool keep_alive = false;
-      // for (auto [it,end] = req["Connection"]; it!=end; ++it) {
-      //   if (strcmp(it->second,"keep-alive")) {
-      //     keep_alive = false;
-      //     break;
-      //   } else keep_alive = true;
-      // }
+      if (strncmp(req.protocol,"HTTP/",5)) {
+        sock.close();
+        return;
+      }
+
+      bool keep_alive = atof(req.protocol+5) >= 1.1;
+      for (auto [it,end] = req["Connection"]; it!=end; ++it) {
+        keep_alive = !strcmp(it->second,"keep-alive");
+      }
 
       /*
 #ifndef NDEBUG
@@ -83,9 +86,9 @@ int main(int argc, char* argv[]) {
       TEST(path-1);
       if (!strcmp(req.method,"GET")) { // ===========================
         if (*path=='\0') { // serve index page ----------------------
-          http::send_file(sock,"pages/index.html",keep_alive,
-            // req.qvalue("Accept-Encoding","gzip"));
-            false);
+          http::send_file(sock,"pages/index.html",
+            req.qvalue("Accept-Encoding","gzip"));
+            // false);
 
         } else if (!strcmp(path,"hist")) {
           if (const auto f = file_cache("pages/hist/page.html")) {
@@ -102,9 +105,9 @@ int main(int argc, char* argv[]) {
                 }
                 ss << "];\n";
                 return std::move(ss).str();
-              }()), "html", keep_alive,
-              // req.qvalue("Accept-Encoding","gzip")
-              false
+              }()), "html",
+              req.qvalue("Accept-Encoding","gzip")
+              // false
             );
           } else {
             // TODO: send file without caching
@@ -134,9 +137,9 @@ int main(int argc, char* argv[]) {
             } else break;
           }
           // serve a file
-          http::send_file(sock,cat("files/",path).c_str(),keep_alive,
-            // req.qvalue("Accept-Encoding","gzip"));
-            false);
+          http::send_file(sock,cat("files/",path).c_str(),
+            req.qvalue("Accept-Encoding","gzip"));
+            // false);
         }
       } else if (!strcmp(req.method,"POST")) { // ===================
         if (false) {
@@ -149,6 +152,7 @@ int main(int argc, char* argv[]) {
 
       // must close the socket if not keep-alive
       if (!keep_alive) sock.close();
+      // must close socket on any error
     } catch (const http::error& e) {
       sock << e;
       sock.close();

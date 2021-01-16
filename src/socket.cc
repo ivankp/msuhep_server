@@ -1,8 +1,11 @@
 #include "socket.hh"
+
 #include <unistd.h>
-#include <sched.h>
+// #include <sched.h>
+#include <thread>
+
 #include "error.hh"
-#include "debug.hh"
+// #include "debug.hh"
 
 namespace ivanp {
 
@@ -12,7 +15,7 @@ size_t socket::read(char* buffer, size_t size) const {
     const auto ret = ::read(fd, buffer, size);
     if (ret < 0) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        ::sched_yield();
+        std::this_thread::yield();
         continue;
       } else THROW_ERRNO("read()");
     } else return nread += ret;
@@ -23,10 +26,9 @@ size_t socket::read(char* buffer, size_t size) const {
 void socket::write(const char* data, size_t size) const {
   while (size) {
     const auto ret = ::write(fd, data, size);
-    TEST(ret)
     if (ret < 0) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
-        ::sched_yield();
+        std::this_thread::yield();
         continue;
       } else THROW_ERRNO("write()");
     }

@@ -118,17 +118,15 @@ public:
 };
 
 std::string header(
-  std::string_view mime, size_t len, bool keep_alive, std::string_view more={}
+  std::string_view mime, size_t len, std::string_view more={}
 );
 
 void send_file(
-  socket fd, const char* name, bool keep_alive, bool gzok=false
+  socket fd, const char* name, bool gzok=false
 );
 
 void send_str(
-  socket fd, std::string_view str,
-  std::string_view mime,
-  bool keep_alive, bool gzok=false
+  socket fd, std::string_view str, std::string_view mime, bool gzok=false
 );
 
 } // end namespace http

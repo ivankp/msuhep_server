@@ -3,13 +3,14 @@
 #include <cstdlib>
 #include <map>
 #include <string>
+#include <thread>
 
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 // #include <sys/mman.h>
-#include <sched.h>
+// #include <sched.h>
 
 #include "scope_fd.hh"
 #include "error.hh"
@@ -49,7 +50,7 @@ retry_cached:
   if ((size_t)sb.st_size > max_size) return std::nullopt;
 
   if (!mx_file_cache.try_lock()) {
-    ::sched_yield();
+    std::this_thread::yield();
     goto retry_cached;
   }
 

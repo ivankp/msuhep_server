@@ -1,11 +1,10 @@
 #include "http.hh"
 
 #include <cstdlib>
-#include <sys/types.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <sys/sendfile.h>
+// #include <sys/sendfile.h>
 
 #include "socket.hh"
 #include "scope_fd.hh"
@@ -217,13 +216,12 @@ form_data::form_data(std::string_view str, bool q) noexcept: mem(str) {
 }
 
 std::string header(
-  std::string_view mime, size_t len, bool keep_alive, std::string_view more
+  std::string_view mime, size_t len, std::string_view more
 ) {
   return cat(
     "HTTP/1.1 200 OK\r\n"
     "Content-Type: ", mime, "\r\n"
-    "Content-Length: ", std::to_string(len), "\r\n"
-    "Connection: ", (keep_alive ? "keep-alive" : "close"), "\r\n",
+    "Content-Length: ", std::to_string(len), "\r\n",
     more, "\r\n");
 }
 
@@ -233,7 +231,7 @@ std::string header(
 #define REDERR std::cerr << "\033[31m" IVANP_ERROR_PREF
 
 // send whole file --------------------------------------------------
-void send_file(socket sock, const char* name, bool keep_alive, bool gzok) {
+void send_file(socket sock, const char* name, bool gzok) {
   scope_fd f1 = ::open(name, O_RDONLY);
   struct stat s1;
   if (f1 == -1)
@@ -303,7 +301,7 @@ failed_gz: ;
   }
 
   // TODO: TCP_CORK
-  sock << header(mime, s1.st_size, keep_alive, encoding);
+  sock << header(mime, s1.st_size, encoding);
   if (const auto f = file_cache(name)) {
     sock << *f;
   } else {
@@ -316,7 +314,8 @@ failed_gz: ;
   //     const auto ret = ::sendfile(sock, f1, &offset, size);
   //     if (ret < 0) {
   //       if (errno == EAGAIN || errno == EWOULDBLOCK) {
-  //         ::sched_yield();
+  //         // ::sched_yield();
+  //         std::this_thread::yield();
   //         continue;
   //       } else THROW_ERRNO("sendfile()");
   //     } else if (ret == 0) break; // NOTE: zero return means done
@@ -327,8 +326,7 @@ failed_gz: ;
 }
 
 void send_str(
-  socket fd, std::string_view str, std::string_view mime,
-  bool keep_alive, bool gzok
+  socket fd, std::string_view str, std::string_view mime, bool gzok
 ) {
   if (!mime.empty()) {
     const auto it = mimes.find(mime);
@@ -339,10 +337,10 @@ void send_str(
   if (gzok) {
     const auto gz = zlib::deflate_s(str);
     fd << cat(
-      http::header(mime,gz.size(),keep_alive,"Content-Encoding: gzip\r\n"),
+      http::header(mime,gz.size(),"Content-Encoding: gzip\r\n"),
       std::string_view(gz.data(),gz.size()) );
   } else {
-    fd << cat(http::header(mime,str.size(),keep_alive), str);
+    fd << cat(http::header(mime,str.size()), str);
   }
 }
 

@@ -2,12 +2,14 @@
 
 #include <unistd.h>
 #include <sys/socket.h>
+// #include <arpa/inet.h>
 #include <netinet/in.h>
+// #include <netinet/tcp.h>
 #include <sys/epoll.h>
 #include <fcntl.h>
 
 #include "error.hh"
-#include "debug.hh"
+// #include "debug.hh"
 
 namespace ivanp {
 namespace {
@@ -25,9 +27,9 @@ server::server(port_t port, unsigned epoll_buffer_size, int epoll_timeout)
   n_epoll_events(epoll_buffer_size),
   epoll_timeout(epoll_timeout)
 {
-  { int enable = 1;
+  { int val = 1;
     PCALL(setsockopt)(
-      main_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+      main_socket, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
   }
 
   sockaddr_in addr;
@@ -57,7 +59,6 @@ void server::epoll_add(int fd) {
 
 void server::loop() noexcept {
   for (;;) {
-    // INFO("35;1","Waiting for events");
     auto n = PCALLR(epoll_wait)(
       epoll, epoll_events, n_epoll_events, epoll_timeout);
     while (n > 0) {
@@ -78,6 +79,19 @@ void server::loop() noexcept {
               if (errno == EAGAIN || errno == EWOULDBLOCK) break;
               else THROW_ERRNO("accept()");
             }
+
+            // { int val = 1; // enable TCP keep alive
+            //   PCALL(setsockopt)(
+            //     sock, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val));
+            //   PCALL(setsockopt)(
+            //     sock, IPPROTO_TCP, TCP_KEEPIDLE, &val, sizeof(val));
+            //   PCALL(setsockopt)(
+            //     sock, IPPROTO_TCP, TCP_KEEPINTVL, &val, sizeof(val));
+            //   val = 10;
+            //   PCALL(setsockopt)(
+            //     sock, IPPROTO_TCP, TCP_KEEPCNT, &val, sizeof(val));
+            // }
+
             nonblock(sock);
             epoll_add(sock);
           }
