@@ -16,7 +16,7 @@ function hide_while_loading(loading) {
 
 function load(url,data) {
   return $.ajax({
-    type: 'POST',
+    type: (data==null ? 'GET' : 'POST'),
     url: url,
     data: data,
     beforeSend: hide_while_loading.bind(null,true),
@@ -41,16 +41,14 @@ function load_labels(dbname) {
   const notes = $('#notes');
   if (notes.length==1) {
     notes.empty();
-    $.post('hist_notes',
-      {'note': dbname},
-      function(note) {
-        if (note.length) {
-          notes.append(note);
-          $("#show_notes").show();
-        } else {
-          $("#show_notes").hide();
-        }
-      });
+    $.get('hist/notes/'+dbname+'.html', note => {
+      if (note.length) {
+        notes.append(note);
+        $("#show_notes").show();
+      } else {
+        $("#show_notes").hide();
+      }
+    });
   }
   return load('hist/data/'+dbname+'.cols').done(function(resp){
     labels_div.empty();
@@ -118,7 +116,7 @@ function load_data(sel,req) {
   if (req_url in cache) {
     args.process_data(req,cache[req_url]);
   } else {
-    return load('hist_req',req).done(function(resp){
+    return load('hist',JSON.stringify(req)).done(function(resp){
       cache[req_url] = resp;
       args.process_data(req,resp);
       sel.focus();
@@ -153,11 +151,11 @@ $('<select>').appendTo(db_div).prop('name','db')
     $('<a>').prop({
       href: '?page='+page
     }).append($('<img>').prop({
-      src: 'img/icons/share.svg',
+      src: 'icons/link.svg',
       alt: 'share',
       height: 16
     }).css({
-      'vertical-align': 'middle'
+      'vertical-align': 'text-bottom'
     })).append('link to this selection')
   // ).append(
   //   [{type:'hidden',name:'source',value:'index'},

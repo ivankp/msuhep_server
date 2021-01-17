@@ -23,6 +23,7 @@ public:
     if (sqlite3_open(filename,&db) != SQLITE_OK)
       THROW_SQLITE("sqlite3_open()");
   }
+  sqlite(const std::string& filename): sqlite(filename.c_str()) { }
   ~sqlite() {
     if (sqlite3_close(db) != SQLITE_OK)
       std::cerr << IVANP_ERROR_PREF "sqlite3_close()"
@@ -34,7 +35,9 @@ public:
     std::swap(db,o.db);
     return *this;
   }
-  sqlite(sqlite&& o) noexcept { std::swap(db,o.db); }
+  sqlite(sqlite&& o) noexcept: db(o.db) {
+    o.db = nullptr;
+  }
 
   sqlite3* operator+() noexcept { return db; }
   const sqlite3* operator+() const noexcept { return db; }

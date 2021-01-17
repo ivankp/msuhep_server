@@ -8,6 +8,7 @@ AS = gcc
 
 CFLAGS := -Wall -O3 -flto -fmax-errors=3 -Iinclude
 # CFLAGS := -Wall -O0 -g -fmax-errors=3 -Iinclude
+CFLAGS += -DNDEBUG
 CXXFLAGS := -std=c++20 $(CFLAGS)
 
 # generate .d files during compilation
@@ -16,25 +17,23 @@ DEPFLAGS = -MT $@ -MMD -MP -MF .build/$*.d
 #####################################################################
 
 all: $(patsubst %, bin/%, \
-  msuhepserver \
+  msuhepserver sqlite3 \
 )
-# sqlite3
 
 #####################################################################
 LIB = -Llib -Wl,-rpath=$(PWD)/lib
 
 bin/msuhepserver: $(patsubst %, .build/%.o, \
-  server socket whole_file file_cache http zlib \
-)
-# lib/libsqlite3.so
+  server socket whole_file file_cache http zlib base64 req/hist \
+) lib/libsqlite3.so
 LF_msuhepserver := -pthread $(LIB)
-L_msuhepserver := -lz
-# -lsqlite3
+L_msuhepserver := -lz -lsqlite3
 
 C__sqlite3 := -Iinclude/sqlite3
 C_sqlite3/sqlite3 := $(C__sqlite3) -fPIC
 lib/libsqlite3.so: $(patsubst %, .build/sqlite3/%.o, \
   sqlite3 )
+L_libsqlite3 := -ldl
 
 C_sqlite3/shell := $(C__sqlite3) -DHAVE_READLINE -DSQLITE_HAVE_ZLIB=1
 LF_sqlite3 := -pthread $(LIB)

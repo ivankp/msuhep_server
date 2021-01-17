@@ -1,5 +1,7 @@
 #include "http.hh"
 
+#include <iostream>
+
 #include <cstdlib>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -44,7 +46,8 @@ const std::map<int,const char*> status_codes {
   {405,"HTTP/1.1 405 Method Not Allowed\r\nAllow: GET, POST\r\n\r\n"},
   {411,"HTTP/1.1 411 Length Required\r\n\r\n"},
   {413,"HTTP/1.1 413 Payload Too Large\r\n\r\n"},
-  {500,"HTTP/1.1 500 Internal Server Error\r\n\r\n"}
+  {500,"HTTP/1.1 500 Internal Server Error\r\n\r\n"},
+  {501,"HTTP/1.1 501 Not Implemented\r\n\r\n"}
 };
 
 request::request(
@@ -52,9 +55,6 @@ request::request(
 ) {
   INFO("35;1","Reading socket ",sock)
   const auto nread = sock.read(buffer,size);
-
-  std::cout << '\n' << nread << '\n'
-    << std::string_view(buffer,nread) << std::endl;
 
   if (nread == 0) return;
 

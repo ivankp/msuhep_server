@@ -1,11 +1,9 @@
 #include "socket.hh"
 
 #include <unistd.h>
-// #include <sched.h>
 #include <thread>
 
 #include "error.hh"
-// #include "debug.hh"
 
 namespace ivanp {
 

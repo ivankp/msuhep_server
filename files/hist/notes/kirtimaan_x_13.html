@@ -1,0 +1,93 @@
+<div style="max-width: 750px;">
+<p>
+Collected here are plots of differential cross sections as functions
+of kinematic invariants that should exhibit behavior that gives rise to
+singularities in expressions for amplitudes for the
+<span class="it nw">
+  g(k<sub>1</sub>) + g(k<sub>2</sub>)
+  &rarr; h(k<sub>3</sub>) + g(k<sub>4</sub>) + g(k<sub>5</sub>)
+</span>
+process.
+Details can be found in
+<a href="Hgg_thresholds.pdf" target="_blank">Kirtimaan's note</a>.
+The histograms were made from GoSam ntuples.
+The histogramming code can be found
+<a href="https://github.com/ivankp/ntuple_analysis/blob/master/studies/kirtimaan_x/analysis.cc" target="_blank">here</a>.
+The top quark mass for the finite mtop ntuples is
+<span class="nw"><span class="it">172.3</span> GeV.</span>
+</p>
+
+<p>
+Variables' definitions:
+</p>
+<ul>
+  <li>
+    <span class="tt">s??</span> and <span class="tt">t??</span>
+    are Mandelstam invariants,
+  </li><li>
+    <span class="tt">x1</span> and <span class="tt">x2</span>
+    are momentum fractions of initial state partons,
+  </li><li>
+    <span class="tt">x_n_i</span>
+    are the kinematic invariants in question.
+  </li>
+</ul>
+
+<p>
+By default,
+<span class="it nw">
+  k<sub>4</sub>
+</span>
+and
+<span class="it nw">
+  k<sub>5</sub>
+</span>
+are the 4-momenta of the leading and subleading jet respectively.<br>
+Histograms with the reverse assignment can be viewed by selecting
+<span class="tt">yes</span>
+in the
+<span class="tt">swap_45</span>
+column.
+</p>
+
+<p><a href="ivan_gosam_mtop_x.pdf" target="_blank">
+Interesting variables
+</a></p>
+
+<div id="x_vars_list"></div>
+
+<div>
+<p class="bf">Functions that cross zero:</p>
+<p id="zero_3" class="tt"></p>
+<p id="zero_4" class="tt"></p>
+</div>
+
+<script>
+  function x_a(p,n,i,t) {
+    const x = `x_${n}_${i}`;
+    $('<a>').prop({
+      href: "?page=hist_db&db=kirtimaan_x_13&proc=H2jB&type=eft+mtop&diag=all&jet=antikt4&weight=weight2&isp=all&photon_cuts=all&swap_45=no&var1="+x+"&zoom=zoom2&logy"
+    }).text(x).appendTo(p).after(t!=null ? t : ' ');
+  }
+
+  const x_vars = [
+    ["Triangles",[3,[0,10]]],
+    ["Boxes, double cut",[4,[0,9]]],
+    ["Boxes, triple cut",[4,[10,12]]],
+    ["Boxes, quadruple cut",[4,[13,30]]]
+  ];
+  const div = $('#x_vars_list');
+  for (xs of x_vars) {
+    $('<p class="bf">').text(xs[0]+':').appendTo(div);
+    const p = $('<p class="tt">').appendTo(div);
+    const n = xs[1][0];
+    const a = xs[1][1][0];
+    const b = xs[1][1][1];
+    for (let i=a; i<=b; ++i) x_a(p,n,i);
+  }
+
+  [[1],[2],[3,'(flat) '],[4]].forEach(i => { x_a($('#zero_3'),3,...i) });
+  [[0],[1],[2],[3,'(flat)']].forEach(i => { x_a($('#zero_4'),4,...i) });
+</script>
+
+</div>

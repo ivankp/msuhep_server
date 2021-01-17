@@ -78,6 +78,8 @@ public:
 
   ~request() { free(own_buffer); }
 
+  operator bool() const noexcept { return method; }
+
   form_data get_params() const noexcept { return { path }; }
 
   auto operator[](const auto& x) const { return header.equal_range(x); }

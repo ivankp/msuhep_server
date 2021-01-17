@@ -1,0 +1,59 @@
+#plots > *, #nodata { margin: 15px 0; }
+#plots > div { display: inline-block; }
+
+#nodata { color: red; }
+
+#dbview_db > [name="db"] { margin: 0 0 5px 0; }
+#dbview_db .hint { color: red; }
+#dbview .share img { margin-right: 5px; }
+#dbview_db :not(:first-child) { margin-left: 6px; }
+#dbview_labels { display: flex; }
+#dbview_labels .label_name {
+  font-family: sans-serif;
+  font-size: 11px;
+}
+#dbview_labels .label_name { padding-right: 10px; }
+#dbview_labels > div { display: inline-block; }
+#dbview_labels > div > div.select { display: flex; }
+#dbview_labels select {
+  flex-grow: 1;
+  width: auto;
+}
+
+.plot_legend:hover {
+  cursor: pointer;
+}
+
+#color_picker {
+  position: absolute;
+  z-index: 1000;
+  padding-left: 5px;
+}
+#color_picker > input {
+  width: 60px;
+}
+
+#show_notes {
+  color: blue;
+  font-size: small;
+  margin-left: 2px;
+  user-select: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+#show_notes:hover {
+  cursor: pointer;
+}
+
+.tt {
+  font-family: monospace;
+}
+
+.context-menu-icon {
+  max-height: 18px;
+  background-repeat: no-repeat;
+  background-position: 4px center;
+  vertical-align: middle;
+}

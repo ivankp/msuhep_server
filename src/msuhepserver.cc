@@ -1,26 +1,21 @@
 #include <iostream>
-#include <iomanip>
 #include <fstream>
 #include <cstdint>
-#include <filesystem>
 #include <algorithm>
 
-// #include <ctre.hpp>
-
-// #include "sqlite3/sqlite.hh"
-// #include "whole_file.hh"
 #include "file_cache.hh"
 #include "server.hh"
 #include "http.hh"
 #include "error.hh"
 #include "debug.hh"
 
+#include "req/hist.hh"
+
 using std::cout;
+using std::endl;
 using std::string;
 using std::string_view;
 using namespace ivanp;
-
-// sqlite db("db/database.db");
 
 int main(int argc, char* argv[]) {
   server::port_t server_port = 80;
@@ -45,10 +40,8 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  // db("PRAGMA foreign_keys=ON;");
-
   server server(server_port,epoll_buffer_size,epoll_timeout);
-  cout << "Listening on port " << server_port <<'\n'<< std::endl;
+  cout << "Listening on port " << server_port <<'\n'<< endl;
 
   server(nthreads, thread_buffer_size,
   [](socket sock, char* buffer, size_t buffer_size){
@@ -56,20 +49,17 @@ int main(int argc, char* argv[]) {
     try {
       INFO("35;1","HTTP");
       http::request req(sock, buffer, buffer_size);
-      if (!req.method) return;
+      if (!req) return;
       const auto g = req.get_params();
 
-      if (strncmp(req.protocol,"HTTP/",5)) {
-        sock.close();
-        return;
-      }
+      if (strncmp(req.protocol,"HTTP/",5))
+        HTTP_ERROR(400,"not HTTP protocol");
 
       bool keep_alive = atof(req.protocol+5) >= 1.1;
       for (auto [it,end] = req["Connection"]; it!=end; ++it) {
         keep_alive = !strcmp(it->second,"keep-alive");
       }
 
-      /*
 #ifndef NDEBUG
       cout << req.method << '\n' << req.path << '\n' << req.protocol << '\n';
       for (const auto& [key, val]: req.header)
@@ -78,41 +68,17 @@ int main(int argc, char* argv[]) {
       cout << g.path() << '\n';
       for (const auto& [key, val]: g.params)
         cout << (key ? key : "NULL") << ": " << (val ? val : "NULL") << '\n';
-      cout << std::endl;
+      cout << endl;
 #endif
-      */
 
       const char* path = g.path()+1;
-      TEST(path-1);
       if (!strcmp(req.method,"GET")) { // ===========================
         if (*path=='\0') { // serve index page ----------------------
           http::send_file(sock,"pages/index.html",
             req.qvalue("Accept-Encoding","gzip"));
-            // false);
 
         } else if (!strcmp(path,"hist")) {
-          if (const auto f = file_cache("pages/hist/page.html")) {
-            http::send_str(
-              sock, replace_first(*f,"<!-- @VARS -->",[]{
-                std::stringstream ss;
-                ss << "\nconst dbs = [";
-                for (bool first=true; const auto& x :
-                  std::filesystem::directory_iterator("pages/hist/db")
-                ) {
-                  if (first) first = false;
-                  else ss << ',';
-                  ss << std::quoted(x.path().filename().string());
-                }
-                ss << "];\n";
-                return std::move(ss).str();
-              }()), "html",
-              req.qvalue("Accept-Encoding","gzip")
-              // false
-            );
-          } else {
-            // TODO: send file without caching
-            HTTP_ERROR(500,"page cannot be cached");
-          }
+          req_get_hist(sock, req);
 
         } else { // serve any allowed file --------------------------
           // disallow arbitrary path
@@ -139,16 +105,16 @@ int main(int argc, char* argv[]) {
           // serve a file
           http::send_file(sock,cat("files/",path).c_str(),
             req.qvalue("Accept-Encoding","gzip"));
-            // false);
         }
       } else if (!strcmp(req.method,"POST")) { // ===================
-        if (false) {
+        if (!strcmp(path,"hist")) {
+          req_post_hist(sock, req);
         } else {
           HTTP_ERROR(400,"POST with unexpected path \"",path,'\"');
         }
+      } else {
+        HTTP_ERROR(501,req.method," method not implemented");
       }
-
-      TEST(path-1);
 
       // must close the socket if not keep-alive
       if (!keep_alive) sock.close();

@@ -60,8 +60,9 @@ std::vector<char> deflate_s(std::string_view str, bool gz) {
     zs.next_out = reinterpret_cast<unsigned char*>(
       out.data() + (out.size() - chunk) );
     zs.avail_out = chunk;
-    while ((ret = ::deflate(&zs, Z_FINISH)) == Z_OK || ret == Z_BUF_ERROR) { }
-    if (ret != Z_STREAM_END) ERROR("deflate(): ",zerrmsg(ret));
+    // while ((ret = ::deflate(&zs, Z_FINISH)) == Z_OK || ret == Z_BUF_ERROR) { }
+    // if (ret != Z_STREAM_END) ERROR("deflate(): ",zerrmsg(ret));
+    ::deflate(&zs, Z_FINISH);
   } while (zs.avail_out == 0);
   if (zs.avail_in != 0) ERROR("uncompressed data remains");
 
