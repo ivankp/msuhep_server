@@ -3,6 +3,8 @@
 #include <string>
 #include <map>
 #include <filesystem>
+#include <mutex>
+#include <shared_mutex>
 
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -12,6 +14,8 @@
 #include "sqlite3/sqlite.hh"
 #include "file_cache.hh"
 #include "error.hh"
+
+#undef NDEBUG
 #include "debug.hh"
 
 using nlohmann::json;
@@ -27,8 +31,8 @@ void req_get_hist(ivanp::socket sock, const ivanp::http::request& req) {
           std::filesystem::directory_iterator("files/hist/data")
         ) {
           auto name = x.path().filename().string();
-          if (!name.ends_with(".db")) continue;
-          name.erase(name.size()-3);
+          if (!name.ends_with(".cols")) continue;
+          name.erase(name.size()-5);
           if (first) first = false;
           else ss << ',';
           ss << std::quoted(name);
@@ -52,6 +56,7 @@ std::map<std::string,std::pair<
     decltype(std::declval<struct stat>().st_mtim.tv_nsec)
   >
 >> db_map;
+std::shared_mutex mx_db_map;
 
 sqlite& get_db(const std::string& name) {
   const std::string fname = "files/hist/data/"+name+".db";
@@ -62,14 +67,18 @@ sqlite& get_db(const std::string& name) {
     s.st_mtim.tv_sec,
     s.st_mtim.tv_nsec
   );
-  if (auto it = db_map.find(name);
-    it != db_map.end() && mtime < it->second.second
-  ) return it->second.first;
-  return db_map.emplace(
-    std::piecewise_construct,
-    std::forward_as_tuple(name),
-    std::forward_as_tuple(fname,mtime)
-  ).first->second.first;
+  { std::shared_lock lock(mx_db_map);
+    if (auto it = db_map.find(name);
+      it != db_map.end() && mtime == it->second.second
+    ) return it->second.first;
+  }
+  { std::unique_lock lock(mx_db_map);
+    return db_map.emplace(
+      std::piecewise_construct,
+      std::forward_as_tuple(name),
+      std::forward_as_tuple(fname,mtime)
+    ).first->second.first;
+  }
 }
 
 void req_post_hist(ivanp::socket sock, const ivanp::http::request& req) {
@@ -82,15 +91,16 @@ void req_post_hist(ivanp::socket sock, const ivanp::http::request& req) {
     }
   }();
 
-  static auto stmt = db.prepare("pragma table_info(hist)", true);
   std::vector<std::string> cols;
   bool blob = false;
-  while (stmt.step()) {
-    const char* col = stmt.column_text(1);
-    if (!blob && !strcmp(col,"_data") && !strcmp(stmt.column_text(2),"BLOB"))
-      blob = true;
-    cols.emplace_back(col);
-  }
+  db("pragma table_info(hist)",
+  [&](int ncol, char** row, char** cols_names) mutable {
+    for (int i=0; i<ncol; ++i) {
+      cols.emplace_back(row[1]);
+      if (!blob && !strcmp(row[1],"_data") && !strcmp(row[2],"BLOB"))
+        blob = true;
+    }
+  });
 
   const auto& labels = jreq["labels"];
   // TEST(labels)
@@ -101,10 +111,97 @@ void req_post_hist(ivanp::socket sock, const ivanp::http::request& req) {
 key_ok: ;
   }
 
-  std::string resp;
+  std::stringstream out;
+  out << '[';
 
   if (blob) {
-    // TODO
+    std::stringstream sql;
+    sql << "SELECT uniform, edges, _head, _data, var1";
+    for (const auto& [key,val] : labels.items())
+      if (val.size() > 1)
+        sql << ", " << key;
+    sql << " FROM hist"
+      " INNER JOIN axis_dict ON hist._axis = axis_dict.rowid"
+      " WHERE ";
+    bool first = true;
+    for (const auto& [key,xs] : labels.items()) {
+      if (first) first = false;
+      else sql << " AND ";
+      sql << '(';
+      { bool first = true;
+        for (const auto& x : xs) {
+          if (first) first = false;
+          else sql << " OR ";
+          sql << key << '=' << x;
+        }
+      }
+      sql << ')';
+    }
+
+    { bool first = true;
+      auto stmt = db.prepare(sql.str().c_str());
+      while (stmt.step()) {
+        if (first) first = false;
+        else out << ',';
+        out << '[';
+
+        const bool njets = starts_with(stmt.column_text(4),"Njets_");
+
+        if (stmt.column_int(0)) { // uniform axis
+          const auto axis = json::parse(stmt.column_text(1));
+          const int nbins = axis[0];
+          out << '[';
+          if (njets) {
+            for (int n=nbins+2, i=0; i<n; ++i) {
+              if (i) out << ',';
+              out << i;
+            }
+          } else {
+            const double a = axis[1], b = axis[2];
+            const double width = (b-a)/nbins;
+            for (int n=nbins+1, i=0; i<n; ++i) {
+              if (i) out << ',';
+              out << (a + i*width);
+            }
+          }
+          out << ']';
+        } else {
+          out << stmt.column_text(1);
+        }
+
+        if (strcmp(stmt.column_text(2),"f8,f8,u4"))
+          ERROR("unexpected hist bin format ",stmt.column_text(2));
+
+        out << ",[";
+        if (njets) {
+          out << "0,0,";
+        }
+        { int data_len = stmt.column_bytes(3);
+          const char* data =
+            reinterpret_cast<const char*>(stmt.column_blob(3));
+          bool first_bin = true;
+          double b[2];
+          while (data_len) {
+            if (data_len < 0) ERROR("wrong hist data length");
+            if (first_bin) first_bin = false;
+            else out << ',';
+            memcpy(b,data,16);
+            out << b[0] << ',' << b[1];
+            data += 20;
+            data_len -= 20;
+          }
+        }
+        out << "],\"";
+        const int ncol = stmt.column_count();
+        for (int i=5; i<ncol; ++i) {
+          if (i) out << ' ';
+          const char* x = stmt.column_text(i);
+          out << (*x=='\0' ? "*" : x);
+        }
+        out << "\"]";
+      }
+    }
+
   } else {
     std::stringstream sql;
     sql << "SELECT edges, bins";
@@ -130,9 +227,7 @@ key_ok: ;
     }
     // TEST(sql.str())
 
-    std::stringstream out;
-    out << '[';
-    db.exec(sql.str().c_str(),
+    db(sql.str().c_str(),
     [&,first=true](int ncol, char** row, char** cols_names) mutable {
       if (first) first = false;
       else out << ',';
@@ -145,11 +240,11 @@ key_ok: ;
       }
       out << "\"]";
     });
-    out << ']';
     // TEST(out.str())
-    resp = std::move(out).str();
   }
 
-  // TEST(resp)
-  http::send_str(sock, resp, "json", req.qvalue("Accept-Encoding","gzip"));
+  out << ']';
+  // TEST(out)
+  http::send_str(sock, out.str(), "json",
+    req.qvalue("Accept-Encoding","gzip"));
 }
