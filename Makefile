@@ -24,7 +24,8 @@ all: $(patsubst %, bin/%, \
 LIB = -Llib -Wl,-rpath=$(PWD)/lib
 
 bin/msuhepserver: $(patsubst %, .build/%.o, \
-  server socket whole_file file_cache http zlib base64 req/hist \
+  server socket whole_file file_cache http zlib base64 lex_str_sort \
+  req/hist \
 ) lib/libsqlite3.so
 LF_msuhepserver := -pthread $(LIB)
 L_msuhepserver := -lz -lsqlite3

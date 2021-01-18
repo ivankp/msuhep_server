@@ -13,9 +13,8 @@
 
 #include "sqlite3/sqlite.hh"
 #include "file_cache.hh"
+#include "lex_str_sort.hh"
 #include "error.hh"
-
-#undef NDEBUG
 #include "debug.hh"
 
 using nlohmann::json;
@@ -25,14 +24,21 @@ void req_get_hist(ivanp::socket sock, const ivanp::http::request& req) {
   if (const auto f = file_cache("pages/hist/page.html")) {
     http::send_str(
       sock, replace_first(*f,"<!-- @VARS -->",[]{
-        std::stringstream ss;
-        ss << "\nconst dbs = [";
-        for (bool first=true; const auto& x :
+        std::vector<std::string> names;
+        for (const auto& x :
           std::filesystem::directory_iterator("files/hist/data")
         ) {
           auto name = x.path().filename().string();
           if (!name.ends_with(".cols")) continue;
           name.erase(name.size()-5);
+          names.emplace_back(std::move(name));
+        }
+
+        lex_str_sort(names);
+
+        std::stringstream ss;
+        ss << "\nconst dbs = [";
+        for (bool first=true; const auto& name : names) {
           if (first) first = false;
           else ss << ',';
           ss << std::quoted(name);
