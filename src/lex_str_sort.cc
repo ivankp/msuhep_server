@@ -44,6 +44,7 @@ bool lex_str_less(std::string_view a, std::string_view b) noexcept {
       s1 = std::from_chars(s1,z1,u1).ptr;
       s2 = std::from_chars(s2,z2,u2).ptr;
       if (u1 != u2) return u1 < u2;
+      continue;
     } else if (c1 != c2) return c1 < c2;
 
     ++s1, ++s2;
